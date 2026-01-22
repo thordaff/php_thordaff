@@ -16,41 +16,36 @@
     } catch (PDOException $e) {
         die("Could not connect to the database $dbname :" . $e->getMessage());
     }
+    
+    $searchNama = $_POST['nama'] ?? '';
+    $searchAlamat = $_POST['alamat'] ?? '';
 
-    $searchResults = [];
-    $searched = false;
+    $sql = "SELECT 
+                p.id,
+                p.nama,
+                p.alamat,
+                GROUP_CONCAT(h.hobi ORDER BY h.hobi SEPARATOR ', ') as hobi_list
+            FROM person p
+            LEFT JOIN hobi h ON p.id = h.person_id
+            WHERE 1=1";
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search'])) {
-        $searched = true;
-        $nama = $_POST['nama'] ?? '';
-        $alamat = $_POST['alamat'] ?? '';
-        
-        $sql = "SELECT p.id, p.nama, p.alamat, h.hobi 
-                FROM person p 
-                LEFT JOIN hobi h ON p.id = h.person_id 
-                WHERE 1=1";
-        
-        $params = [];
-        
-        if (!empty($nama)) {
-            $sql .= " AND p.nama LIKE :nama";
-            $params[':nama'] = "%$nama%";
-        }
-        
-        if (!empty($alamat)) {
-            $sql .= " AND p.alamat LIKE :alamat";
-            $params[':alamat'] = "%$alamat%";
-        }
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $searchResults = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $params = [];
+
+    if (!empty($searchNama)) {
+        $sql .= " AND p.nama LIKE :nama";
+        $params[':nama'] = "%$searchNama%";
     }
 
-    $stmt = $pdo->query("SELECT p.id, p.nama, p.alamat, h.hobi 
-                        FROM person p 
-                        LEFT JOIN hobi h ON p.id = h.person_id");
-    $allData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!empty($searchAlamat)) {
+        $sql .= " AND p.alamat LIKE :alamat";
+        $params[':alamat'] = "%$searchAlamat%";
+    }
+
+    $sql .= " GROUP BY p.id, p.nama, p.alamat ORDER BY p.id";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -58,7 +53,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soal 3 - Person & Hobi</title>
+    <title>Soal 3 - Technical Test</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -77,6 +72,10 @@
             color: #333;
             border-bottom: 2px solid #4CAF50;
             padding-bottom: 10px;
+        }
+        h3 {
+            color: #333;
+            margin-top: 20px;
         }
         .form-group {
             margin-bottom: 15px;
@@ -100,9 +99,16 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
+            margin-right: 10px;
         }
         button:hover {
             background-color: #45a049;
+        }
+        .btn-reset {
+            background-color: #999;
+        }
+        .btn-reset:hover {
+            background-color: #777;
         }
         table {
             width: 100%;
@@ -130,9 +136,7 @@
     <div class="container">
         <h2>Data Person dan Hobi</h2>
         
-        <!-- Section 1: All Data -->
         <div class="section">
-            <h3>Semua Data</h3>
             <table>
                 <thead>
                     <tr>
@@ -142,71 +146,40 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (count($allData) > 0): ?>
-                        <?php foreach ($allData as $row): ?>
+                    <?php if (count($results) > 0): ?>
+                        <?php foreach ($results as $row): ?>
                             <tr>
                                 <td><?= htmlspecialchars($row['nama']) ?></td>
                                 <td><?= htmlspecialchars($row['alamat']) ?></td>
-                                <td><?= htmlspecialchars($row['hobi'] ?? '-') ?></td>
+                                <td><?= htmlspecialchars($row['hobi_list'] ?? '-') ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="3" style="text-align: center;">Tidak ada data</td>
+                            <td colspan="3" style="text-align: center;">Tidak ada data ditemukan</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
 
-        <!-- Section 2: Search Form -->
-        <div class="section" id="search-form">
+        <div class="section">
             <h3>Pencarian</h3>
-            <form method="POST" action="#hasil-pencarian">
+            <form method="POST" action="">
                 <div class="form-group">
                     <label>Nama:</label>
-                    <input type="text" name="nama" value="<?= htmlspecialchars($_POST['nama'] ?? '') ?>">
+                    <input type="text" name="nama" value="<?= htmlspecialchars($searchNama) ?>">
                 </div>
                 <div class="form-group">
                     <label>Alamat:</label>
-                    <input type="text" name="alamat" value="<?= htmlspecialchars($_POST['alamat'] ?? '') ?>">
+                    <input type="text" name="alamat" value="<?= htmlspecialchars($searchAlamat) ?>">
                 </div>
                 <div class="form-group">
-                    <button type="submit" name="search">SEARCH</button>
+                    <button type="submit">SEARCH</button>
+                    <button type="button" class="btn-reset" onclick="window.location.href='soal3.php'">RESET</button>
                 </div>
             </form>
         </div>
-
-        <!-- Section 3: Search Results -->
-        <?php if ($searched): ?>
-        <div class="section" id="hasil-pencarian">
-            <h3>Hasil Pencarian</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nama</th>
-                        <th>Alamat</th>
-                        <th>Hobi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (count($searchResults) > 0): ?>
-                        <?php foreach ($searchResults as $row): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($row['nama']) ?></td>
-                                <td><?= htmlspecialchars($row['alamat']) ?></td>
-                                <td><?= htmlspecialchars($row['hobi'] ?? '-') ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="3" style="text-align: center;">Tidak ada hasil yang ditemukan</td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php endif; ?>
     </div>
 </body>
 </html>
